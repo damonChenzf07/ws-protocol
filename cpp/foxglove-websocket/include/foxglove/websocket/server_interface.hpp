@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include <optional>
+//#include <optional>
 #include <regex>
 #include <string>
 #include <unordered_map>
@@ -10,6 +10,12 @@
 
 #include "common.hpp"
 #include "parameter.hpp"
+#include "optional.hpp"
+
+using hs::optional;
+using hs::nullopt;
+using hs::in_place;
+using hs::make_optional;
 
 namespace foxglove {
 
@@ -37,10 +43,10 @@ struct ServerHandlers {
   std::function<void(const ClientAdvertisement&, ConnectionHandle)> clientAdvertiseHandler;
   std::function<void(ClientChannelId, ConnectionHandle)> clientUnadvertiseHandler;
   std::function<void(const ClientMessage&, ConnectionHandle)> clientMessageHandler;
-  std::function<void(const std::vector<std::string>&, const std::optional<std::string>&,
+  std::function<void(const std::vector<std::string>&, const optional<std::string>&,
                      ConnectionHandle)>
     parameterRequestHandler;
-  std::function<void(const std::vector<Parameter>&, const std::optional<std::string>&,
+  std::function<void(const std::vector<Parameter>&, const optional<std::string>&,
                      ConnectionHandle)>
     parameterChangeHandler;
   std::function<void(const std::vector<std::string>&, ParameterSubscriptionOperation,
@@ -61,7 +67,7 @@ public:
   virtual void removeChannels(const std::vector<ChannelId>& channelIds) = 0;
   virtual void publishParameterValues(ConnectionHandle clientHandle,
                                       const std::vector<Parameter>& parameters,
-                                      const std::optional<std::string>& requestId) = 0;
+                                      const optional<std::string>& requestId) = 0;
   virtual void updateParameterValues(const std::vector<Parameter>& parameters) = 0;
   virtual std::vector<ServiceId> addServices(const std::vector<ServiceWithoutId>& services) = 0;
   virtual void removeServices(const std::vector<ServiceId>& serviceIds) = 0;

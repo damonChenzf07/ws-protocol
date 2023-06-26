@@ -1,14 +1,23 @@
 cmake_minimum_required(VERSION 3.15)
 project(FoxgloveWebSocket CXX)
-
-find_package(nlohmann_json REQUIRED)
+#option (ASIO_STANDALONE "Build websocketpp  with standalone Asio." TRUE)
+add_definitions (-D_WEBSOCKETPP_CPP14_STL_)
+add_definitions (-DASIO_STANDALONE)
+set(CMAKE_CXX_STANDARD 14)
 find_package(websocketpp REQUIRED)
-find_package(asio REQUIRED)
+find_package(nlohmann_json REQUIRED)
+#find_package(PkgConfig REQUIRED)
+#pkg_check_modules (asio REQUIRED)
+#pkg_get_variable(ASIO_MODULE_DIR asio asio)
+
+list(APPEND pub_includes ${ASIO_MODULE_DIR})
 
 add_library(foxglove_websocket src/parameter.cpp src/serialization.cpp)
 target_include_directories(foxglove_websocket PUBLIC include)
-target_link_libraries(foxglove_websocket nlohmann_json::nlohmann_json websocketpp::websocketpp asio::asio)
-set_target_properties(foxglove_websocket PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_include_directories(foxglove_websocket PUBLIC pub_includes)
+#target_link_libraries(foxglove_websocket nlohmann_json::nlohmann_json websocketpp::websocketpp asio::asio)
+target_link_libraries(foxglove_websocket nlohmann_json::nlohmann_json websocketpp::websocketpp)
+set_target_properties(foxglove_websocket PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
 
 install(TARGETS foxglove_websocket)
 INSTALL (DIRECTORY ${CMAKE_SOURCE_DIR}/include/

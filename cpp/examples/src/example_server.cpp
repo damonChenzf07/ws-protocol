@@ -14,7 +14,7 @@
 #include <unordered_set>
 
 #include "foxglove/SceneUpdate.pb.h"
-
+#include "foxglove/CompressedImage.pb.h"
 namespace foxglove {
 template <>
 void Server<WebSocketNoTls>::setupTlsHandler() {}
@@ -29,7 +29,7 @@ static uint64_t nanosecondsSinceEpoch() {
 // Adapted from:
 // https://gist.github.com/tomykaira/f0fd86b6c73063283afe550bc5d77594
 // https://github.com/protocolbuffers/protobuf/blob/01fe22219a0312b178a265e75fe35422ea6afbb1/src/google/protobuf/compiler/csharp/csharp_helpers.cc#L346
-static std::string Base64Encode(std::string_view input) {
+static std::string Base64Encode(std::string input) {
   constexpr const char ALPHABET[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   std::string result;
@@ -95,7 +95,24 @@ static void setAxisAngle(foxglove::Quaternion* q, double x, double y, double z, 
   q->set_w(std::cos(angle / 2));
 }
 
+static char dataBufTmp [2 * 1024 * 1024];
+static int dataBufTmpSize = 0;
+
 int main() {
+
+  std::string stdPicPath = "/apollo/iChery20230613-212936.jpg";
+  int fd = open(stdPicPath.c_str(), O_RDWR);
+  if (fd > 0) {
+    memset(dataBufTmp, 0, sizeof(dataBufTmp));
+    dataBufTmpSize = read(fd, dataBufTmp, sizeof(dataBufTmp) -1);
+    std::cout << " Read Pic File " << dataBufTmpSize << " bytes !!!" << std::endl;
+    close(fd);
+  } else {
+    std::cout << " Open File  " << stdPicPath << " Failed!!!" << std::endl;
+    return -1;
+  }
+
+
   const auto logHandler = [](foxglove::WebSocketLogLevel, char const* msg) {
     std::cout << msg << std::endl;
   };
@@ -113,15 +130,27 @@ int main() {
   server->setHandlers(std::move(hdlrs));
   server->start("0.0.0.0", 8765);
 
-  const auto chanelIds = server->addChannels({{
+  const auto chanelIds = server->addChannels({
+  {
     .topic = "example_msg",
     .encoding = "protobuf",
     .schemaName = foxglove::SceneUpdate::descriptor()->full_name(),
     .schema = Base64Encode(SerializeFdSet(foxglove::SceneUpdate::descriptor())),
-  }});
+  },
+  {
+    .topic = "/apollo/sensor/camera/front_main/image/compressed",
+    .encoding = "protobuf",
+    .schemaName = foxglove::CompressedImage::descriptor()->full_name(),
+    .schema = Base64Encode(SerializeFdSet(foxglove::CompressedImage::descriptor())),
+  }  
+  });
   const auto chanId = chanelIds.front();
 
   bool running = true;
+
+  std::cout << "schemaName: " << foxglove::CompressedImage::descriptor()->full_name() << std::endl;
+  std::cout << "SerializeFdSet: " << SerializeFdSet(foxglove::CompressedImage::descriptor()) << std::endl;
+
 
   asio::signal_set signals(server->getEndpoint().get_io_service(), SIGINT);
   signals.async_wait([&](std::error_code const& ec, int sig) {
@@ -133,6 +162,7 @@ int main() {
     running = false;
   });
 
+  uint32_t sequence_num = 1;
   while (running) {
     const auto now = nanosecondsSinceEpoch();
     foxglove::SceneUpdate msg;
@@ -159,6 +189,28 @@ int main() {
     const auto serializedMsg = msg.SerializeAsString();
     server->broadcastMessage(chanId, now, reinterpret_cast<const uint8_t*>(serializedMsg.data()),
                              serializedMsg.size());
+
+
+    foxglove::CompressedImage Imgmsg;
+
+    // foxglove::Header* hdr = Imgmsg.mutable_header();
+    // hdr->set_timestamp_sec((double)now / 1000000000);
+    // hdr->set_module_name("");
+    // hdr->set_sequence_num(0);
+    // hdr->set_version(1);
+    // hdr->set_frame_id("camera_front_main");
+
+    Imgmsg.set_data(dataBufTmp, dataBufTmpSize);
+
+    Imgmsg.set_frame_id("base_link");
+    Imgmsg.set_format("rgb8;jepg compressed bgr8");
+    // Imgmsg.set_frame_type(0);
+    // Imgmsg.set_measurement_time(0);
+
+
+    const auto serializedImgMsg = Imgmsg.SerializeAsString();
+    server->broadcastMessage(chanId + 1, now, reinterpret_cast<const uint8_t*>(serializedImgMsg.data()),
+                             serializedImgMsg.size());
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
